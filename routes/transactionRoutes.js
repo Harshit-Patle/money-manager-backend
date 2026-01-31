@@ -11,12 +11,16 @@ const {
 
 const router = express.Router();
 
-// Protected routes
+// SUMMARY
 router.get("/summary/categories", authMiddleware, getCategorySummary);
+
+// TRANSACTIONS
 router.post("/", authMiddleware, addTransaction);
 router.get("/", authMiddleware, getTransactions);
 router.put("/:id", authMiddleware, updateTransaction);
 router.delete("/:id", authMiddleware, deleteTransaction);
+
+// ACCOUNT TRANSFER
 router.post("/transfer", authMiddleware, transferAmount);
 
 module.exports = router;

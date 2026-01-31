@@ -1,12 +1,20 @@
 const Transaction = require("../models/Transaction");
+const mongoose = require("mongoose");
 
-// ADD income / expense
+/* =========================
+   ADD INCOME / EXPENSE
+========================= */
 exports.addTransaction = async (req, res) => {
     try {
-        const { type, amount, category, division, description } = req.body;
+        let { type, amount, category, division, description, account } = req.body;
+        amount = Number(amount);
 
-        if (!type || !amount || !category || !division) {
+        if (!type || !amount || !category || !division || !account) {
             return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ message: "Invalid amount" });
         }
 
         const transaction = await Transaction.create({
@@ -15,6 +23,7 @@ exports.addTransaction = async (req, res) => {
             amount,
             category,
             division,
+            account,
             description,
         });
 
@@ -24,28 +33,28 @@ exports.addTransaction = async (req, res) => {
     }
 };
 
-
+/* =========================
+   GET TRANSACTIONS (FILTERS)
+========================= */
 exports.getTransactions = async (req, res) => {
     try {
         const { type, category, division, from, to } = req.query;
 
-        // Base filter: user-specific (SECURITY)
         const filter = { userId: req.user.id };
 
-        // Optional filters
         if (type) filter.type = type;
         if (category) filter.category = category;
         if (division) filter.division = division;
 
-        // Date range filter
         if (from || to) {
             filter.createdAt = {};
             if (from) filter.createdAt.$gte = new Date(from);
             if (to) filter.createdAt.$lte = new Date(to);
         }
 
-        const transactions = await Transaction.find(filter)
-            .sort({ createdAt: -1 });
+        const transactions = await Transaction.find(filter).sort({
+            createdAt: -1,
+        });
 
         res.json(transactions);
     } catch (error) {
@@ -53,7 +62,9 @@ exports.getTransactions = async (req, res) => {
     }
 };
 
-// UPDATE transaction with 12-hour restriction
+/* =========================
+   UPDATE (12-HOUR RULE)
+========================= */
 exports.updateTransaction = async (req, res) => {
     try {
         const transaction = await Transaction.findOne({
@@ -65,19 +76,16 @@ exports.updateTransaction = async (req, res) => {
             return res.status(404).json({ message: "Transaction not found" });
         }
 
-        // ⏱️ 12-hour edit restriction logic
         const createdTime = new Date(transaction.createdAt).getTime();
-        const currentTime = new Date().getTime();
-
-        const TWELVE_HOURS = 12 * 60 * 60 * 1000; // milliseconds
+        const currentTime = Date.now();
+        const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
         if (currentTime - createdTime > TWELVE_HOURS) {
-            return res.status(403).json({
-                message: "Editing is allowed only within 12 hours",
-            });
+            return res
+                .status(403)
+                .json({ message: "Editing allowed only within 12 hours" });
         }
 
-        // Update allowed
         const updatedTransaction = await Transaction.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -90,12 +98,14 @@ exports.updateTransaction = async (req, res) => {
     }
 };
 
-// DELETE transaction
+/* =========================
+   DELETE TRANSACTION
+========================= */
 exports.deleteTransaction = async (req, res) => {
     try {
         const transaction = await Transaction.findOneAndDelete({
             _id: req.params.id,
-            userId: req.user.id, // SECURITY
+            userId: req.user.id,
         });
 
         if (!transaction) {
@@ -108,15 +118,15 @@ exports.deleteTransaction = async (req, res) => {
     }
 };
 
+/* =========================
+   CATEGORY SUMMARY
+========================= */
 exports.getCategorySummary = async (req, res) => {
     try {
         const { from, to } = req.query;
 
-        const matchStage = {
-            userId: req.user.id,
-        };
+        const matchStage = { userId: req.user.id };
 
-        // Date range filter (if provided)
         if (from || to) {
             matchStage.createdAt = {};
             if (from) matchStage.createdAt.$gte = new Date(from);
@@ -127,10 +137,7 @@ exports.getCategorySummary = async (req, res) => {
             { $match: matchStage },
             {
                 $group: {
-                    _id: {
-                        category: "$category",
-                        type: "$type",
-                    },
+                    _id: { category: "$category", type: "$type" },
                     totalAmount: { $sum: "$amount" },
                 },
             },
@@ -190,10 +197,13 @@ exports.getCategorySummary = async (req, res) => {
     }
 };
 
-// ACCOUNT TRANSFER
+/* =========================
+   ACCOUNT TRANSFER (FIXED)
+========================= */
 exports.transferAmount = async (req, res) => {
     try {
-        const { fromAccount, toAccount, amount, description } = req.body;
+        let { fromAccount, toAccount, amount, description } = req.body;
+        amount = Number(amount);
 
         if (!fromAccount || !toAccount || !amount) {
             return res.status(400).json({ message: "Missing required fields" });
@@ -205,37 +215,41 @@ exports.transferAmount = async (req, res) => {
                 .json({ message: "From and To accounts must be different" });
         }
 
+        if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ message: "Invalid amount" });
+        }
+
         const transferId = new mongoose.Types.ObjectId();
 
-        const expenseTransaction = {
-            userId: req.user.id,
-            type: "expense",
-            amount,
-            category: "Transfer",
-            division: "Personal",
-            description: description || "Account transfer",
-            account: fromAccount,
-            transferId,
-        };
-
-        const incomeTransaction = {
-            userId: req.user.id,
-            type: "income",
-            amount,
-            category: "Transfer",
-            division: "Personal",
-            description: description || "Account transfer",
-            account: toAccount,
-            transferId,
-        };
-
-        await Transaction.create([expenseTransaction, incomeTransaction]);
+        await Transaction.create([
+            {
+                userId: req.user.id,
+                type: "expense",
+                amount,
+                category: "Transfer",
+                division: "Personal",
+                account: fromAccount,
+                description: description || "Account transfer",
+                transferId,
+            },
+            {
+                userId: req.user.id,
+                type: "income",
+                amount,
+                category: "Transfer",
+                division: "Personal",
+                account: toAccount,
+                description: description || "Account transfer",
+                transferId,
+            },
+        ]);
 
         res.status(201).json({
             message: "Amount transferred successfully",
             transferId,
         });
     } catch (error) {
+        console.error("Transfer error:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
