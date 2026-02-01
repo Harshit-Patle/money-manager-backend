@@ -7,6 +7,7 @@ const transactionSchema = new mongoose.Schema(
         amount: Number,
         category: String,
         division: { type: String, enum: ["Personal", "Office"] },
+        account: { type: String, enum: ["Cash", "Bank", "Wallet"] },
         description: String,
     },
     { timestamps: true }

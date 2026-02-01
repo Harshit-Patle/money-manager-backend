@@ -103,7 +103,7 @@ exports.updateTransaction = async (req, res) => {
 ========================= */
 exports.deleteTransaction = async (req, res) => {
     try {
-        const transaction = await Transaction.findOneAndDelete({
+        const transaction = await Transaction.findOne({
             _id: req.params.id,
             userId: req.user.id,
         });
@@ -111,6 +111,18 @@ exports.deleteTransaction = async (req, res) => {
         if (!transaction) {
             return res.status(404).json({ message: "Transaction not found" });
         }
+
+        const createdTime = new Date(transaction.createdAt).getTime();
+        const currentTime = Date.now();
+        const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+        if (currentTime - createdTime > TWELVE_HOURS) {
+            return res
+                .status(403)
+                .json({ message: "Deletion allowed only within 12 hours" });
+        }
+
+        await Transaction.findByIdAndDelete(req.params.id);
 
         res.json({ message: "Transaction deleted successfully" });
     } catch (error) {
