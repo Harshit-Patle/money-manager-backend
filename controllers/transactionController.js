@@ -17,6 +17,12 @@ exports.addTransaction = async (req, res) => {
             return res.status(400).json({ message: "Invalid amount" });
         }
 
+        if (category === "Transfer") {
+            return res.status(400).json({
+                message: "Use the transfers feature for account transfers",
+            });
+        }
+
         const transaction = await Transaction.create({
             userId: req.user.id,
             type,
@@ -38,12 +44,31 @@ exports.addTransaction = async (req, res) => {
 ========================= */
 exports.getTransactions = async (req, res) => {
     try {
-        const { type, category, division, from, to } = req.query;
+        const { type, category, division, from, to, includeTransfers } = req.query;
+
+        const shouldIncludeTransfers =
+            includeTransfers === "1" ||
+            includeTransfers === "true" ||
+            includeTransfers === true;
 
         const filter = { userId: req.user.id };
 
         if (type) filter.type = type;
-        if (category) filter.category = category;
+
+        // Transfers are stored separately and should not appear in standard transaction views.
+        // Allow opt-in for internal calculations (e.g., balance derivation) via includeTransfers.
+        if (!shouldIncludeTransfers) {
+            if (category) {
+                if (category === "Transfer") {
+                    return res.json([]);
+                }
+                filter.category = category;
+            } else {
+                filter.category = { $ne: "Transfer" };
+            }
+        } else {
+            if (category) filter.category = category;
+        }
         if (division) filter.division = division;
 
         if (from || to) {
@@ -86,6 +111,51 @@ exports.updateTransaction = async (req, res) => {
                 .json({ message: "Editing allowed only within 12 hours" });
         }
 
+        if (req.body?.category === "Transfer") {
+            return res.status(400).json({
+                message: "Use the transfers feature for account transfers",
+            });
+        }
+
+        // If this is a transfer pair, update both sides together to avoid inconsistency
+        if (transaction.transferId) {
+            const updates = {};
+
+            if (req.body.amount !== undefined) {
+                const amount = Number(req.body.amount);
+                if (isNaN(amount) || amount <= 0) {
+                    return res.status(400).json({ message: "Invalid amount" });
+                }
+                updates.amount = amount;
+            }
+
+            if (req.body.description !== undefined) {
+                updates.description = req.body.description;
+            }
+
+            // Nothing to update
+            if (Object.keys(updates).length === 0) {
+                const pair = await Transaction.find({
+                    userId: req.user.id,
+                    transferId: transaction.transferId,
+                }).sort({ createdAt: -1 });
+
+                return res.json(pair);
+            }
+
+            await Transaction.updateMany(
+                { userId: req.user.id, transferId: transaction.transferId },
+                { $set: updates }
+            );
+
+            const updatedPair = await Transaction.find({
+                userId: req.user.id,
+                transferId: transaction.transferId,
+            }).sort({ createdAt: -1 });
+
+            return res.json(updatedPair);
+        }
+
         const updatedTransaction = await Transaction.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -122,6 +192,19 @@ exports.deleteTransaction = async (req, res) => {
                 .json({ message: "Deletion allowed only within 12 hours" });
         }
 
+        // If this is a transfer pair, delete both sides together
+        if (transaction.transferId) {
+            const result = await Transaction.deleteMany({
+                userId: req.user.id,
+                transferId: transaction.transferId,
+            });
+
+            return res.json({
+                message: "Transfer deleted successfully",
+                deletedCount: result.deletedCount,
+            });
+        }
+
         await Transaction.findByIdAndDelete(req.params.id);
 
         res.json({ message: "Transaction deleted successfully" });
@@ -137,7 +220,7 @@ exports.getCategorySummary = async (req, res) => {
     try {
         const { from, to } = req.query;
 
-        const matchStage = { userId: req.user.id };
+        const matchStage = { userId: req.user.id, category: { $ne: "Transfer" } };
 
         if (from || to) {
             matchStage.createdAt = {};

@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const transactionSchema = new mongoose.Schema(
     {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        transferId: { type: mongoose.Schema.Types.ObjectId, index: true },
         type: { type: String, enum: ["income", "expense"] },
         amount: Number,
         category: String,

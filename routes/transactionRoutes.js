@@ -1,12 +1,12 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
+const { createTransfer } = require("../controllers/transferController");
 const {
     addTransaction,
     getTransactions,
     updateTransaction,
     deleteTransaction,
     getCategorySummary,
-    transferAmount,
 } = require("../controllers/transactionController");
 
 const router = express.Router();
@@ -21,6 +21,7 @@ router.put("/:id", authMiddleware, updateTransaction);
 router.delete("/:id", authMiddleware, deleteTransaction);
 
 // ACCOUNT TRANSFER
-router.post("/transfer", authMiddleware, transferAmount);
+// Backward-compatible alias: transfers are stored as a dedicated document.
+router.post("/transfer", authMiddleware, createTransfer);
 
 module.exports = router;
