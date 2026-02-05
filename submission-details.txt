@@ -1,0 +1,20 @@
+Money Manager Web Application – Submission Details
+
+Project Description:
+A modern web application for managing personal and business finances with real-time analytics, transaction tracking, and comprehensive filtering capabilities. Built with React and Node.js, it features interactive dashboards, category-wise spending summaries, account transfers, and time-based transaction editing rules.
+
+Frontend GitHub Repository:
+https://github.com/Harshit-Patle/money-manager-frontend
+
+Backend GitHub Repository:
+https://github.com/Harshit-Patle/money-manager-backend
+
+Live Application URL:
+https://money-manager-frontend-six.vercel.app
+
+Demo Video:
+https://youtu.be/rktBu7ZuGrE
+
+Final Commit Hashes:
+Frontend: 2f4607a1d27a39cdd971d6abf2913828bc37465d
+Backend: 590920aff8787bad1f836e2a4a50fa0fee48f1cc

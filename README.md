@@ -16,7 +16,7 @@ The Money Manager backend is a Node.js/Express API that powers the Money Manager
 - Transaction CRUD operations with validation
 - Advanced filtering by date range, categories, and divisions
 - Category-wise summary with aggregation pipelines
-- Account transfer functionality with dual-entry bookkeeping
+- Account transfer functionality (tracked as Transfer records)
 - Time-based edit restrictions (12-hour window)
 - CORS-enabled for cross-origin requests
 
@@ -50,20 +50,19 @@ The Money Manager backend is a Node.js/Express API that powers the Money Manager
 
 ### Account Management
 - **Transfer Between Accounts**: Move funds between Cash/Bank/Wallet accounts
-- **Dual-Entry Bookkeeping**: Expense from source, income to destination
-- **Linked Transactions**: Unique transferId for tracking related transactions
+- **Transfer Records**: Transfers are stored as dedicated `Transfer` documents (source, destination, amount, notes, timestamps)
 - **Transfer Validation**: Prevents same-account transfers
 
 ## 🛠️ Tech Stack
 
 - **Runtime**: Node.js
-- **Framework**: Express 5.2
-- **Database**: MongoDB with Mongoose 9.1
-- **Authentication**: JSON Web Tokens (JWT) 9.0
-- **Password Hashing**: bcryptjs 3.0
-- **Environment Variables**: dotenv 17.2
-- **CORS**: cors 2.8
-- **Dev Tools**: nodemon 3.1
+- **Framework**: Express
+- **Database**: MongoDB with Mongoose
+- **Authentication**: JSON Web Tokens (JWT)
+- **Password Hashing**: bcryptjs
+- **Environment Variables**: dotenv
+- **CORS**: cors
+- **Dev Tools**: nodemon
 
 ## 🔐 Environment Variables
 
@@ -123,7 +122,7 @@ JWT_SECRET=your_super_secret_jwt_key_here
 
 ## 🚀 Final Commit Hash
 
-**Backend Final Implementation Commit**: `2c1f3be7a309cf04a57aa2cdb8143f1600382d9b`
+**Backend Final Implementation Commit**: `590920aff8787bad1f836e2a4a50fa0fee48f1cc`
 
 > **Note**: Any commits after the above hash are documentation-only updates and do not affect the application's functionality. These commits may include README updates, comment additions, or other non-code documentation improvements.
 
