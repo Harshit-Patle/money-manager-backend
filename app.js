@@ -6,6 +6,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// STRIP STAGE PREFIX IF PRESENT (FOR AWS API GATEWAY /default STAGE)
+app.use((req, res, next) => {
+    if (req.url.startsWith("/default")) {
+        req.url = req.url.replace(/^\/default/, "") || "/";
+    }
+    next();
+});
+
 // ROOT HEALTH ROUTE
 app.get("/", (req, res) => {
     res.json({ message: "Money Manager API is running" });
