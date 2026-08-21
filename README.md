@@ -1,134 +1,152 @@
-# Money Manager – Backend
+# Money Manager – Backend API 💸
 
-A robust RESTful API backend for managing personal and business finances with comprehensive transaction tracking, user authentication, and advanced filtering capabilities.
+A secure, scalable RESTful API and serverless microservice for personal and business finance management. Built with Node.js, Express, MongoDB Atlas, and deployed to AWS Lambda behind API Gateway with automated GitHub Actions CI/CD.
+
+---
 
 ## 🔗 Links
 
+- **Live Application (Vercel)**: [https://moneymanager-harshit.vercel.app](https://moneymanager-harshit.vercel.app)
 - **Frontend Repository**: [https://github.com/Harshit-Patle/money-manager-frontend](https://github.com/Harshit-Patle/money-manager-frontend)
-- **Live Application**: [https://money-manager-frontend-six.vercel.app](https://money-manager-frontend-six.vercel.app)
 
-## 📝 Description
+---
 
-The Money Manager backend is a Node.js/Express API that powers the Money Manager application. It provides secure authentication, transaction management, and data analytics endpoints with MongoDB as the database. The API is designed with RESTful principles and includes JWT-based authentication, data validation, and time-based business rules.
+## 📌 Overview & Problem Statement
 
-**Key Capabilities:**
-- Secure user authentication with JWT tokens
-- Transaction CRUD operations with validation
-- Advanced filtering by date range, categories, and divisions
-- Category-wise summary with aggregation pipelines
-- Account transfer functionality (tracked as Transfer records)
-- Time-based edit restrictions (12-hour window)
-- CORS-enabled for cross-origin requests
+Individuals and small businesses often struggle with fragmented financial tracking—lacking clear separation between personal and office expenses, account-to-account visibility, and safeguards against inadvertent modifications to historical ledgers.
 
-## ✨ Features
+The **Money Manager API** provides a centralized, secure backend that:
+1. Isolates records on a per-user basis with strict JWT authentication.
+2. Segregates transactions across **Personal** and **Office** divisions.
+3. Supports multi-account fund tracking (**Cash**, **Bank**, **Wallet**).
+4. Enforces a **12-hour modification rule** to preserve financial data integrity.
+5. Employs a **dual-target serverless architecture** that runs identically in local Node.js development and on AWS Lambda in production.
 
-### Authentication & Security
-- **User Registration**: Secure user signup with password hashing using bcrypt
-- **User Login**: JWT-based authentication for secure session management
-- **Protected Routes**: Middleware-based route protection requiring valid JWT tokens
-- **Password Security**: Bcrypt hashing with salt rounds for enhanced security
+---
 
-### Transaction Management
-- **Add Transactions**: Create income or expense transactions with detailed metadata
-- **Retrieve Transactions**: Get all user transactions with sorting by creation date
-- **Update Transactions**: Edit transactions within 12-hour window
-- **Delete Transactions**: Remove transactions within 12-hour window
-- **Time-Based Restrictions**: Automatic locking of transactions after 12 hours
+## 🏗️ High-Level Architecture
 
-### Advanced Filtering
-- **Type Filter**: Filter by income or expense type
-- **Category Filter**: Filter transactions by specific categories
-- **Division Filter**: Separate Personal and Office transactions
-- **Date Range Filter**: Filter transactions between any two dates (from/to)
-- **Combined Filters**: Apply multiple filters simultaneously for precise queries
+```mermaid
+graph LR
+    Client[React 18 SPA on Vercel] -->|HTTPS Requests / JWT Bearer| APIGW[AWS API Gateway HTTP API]
+    APIGW -->|Proxy Event Payload| Lambda[AWS Lambda: Node.js 20.x via serverless-http]
+    Lambda -->|Cached Connection Pool| MongoDB[(MongoDB Atlas Cluster)]
+    
+    subgraph CI/CD Pipeline
+        GitPush[Git Push to main] --> GHA[GitHub Actions: deploy-backend.yml]
+        GHA -->|Zip Bundle & AWS CLI| Lambda
+    end
+```
 
-### Analytics & Reporting
-- **Category Summary**: Aggregated income/expense totals grouped by category
-- **MongoDB Aggregation**: Efficient data processing with aggregation pipelines
-- **Date Range Analysis**: Optional filtering for historical analysis
-- **Sorted Breakdown**: Category-wise data sorted alphabetically
+---
 
-### Account Management
-- **Transfer Between Accounts**: Move funds between Cash/Bank/Wallet accounts
-- **Transfer Records**: Transfers are stored as dedicated `Transfer` documents (source, destination, amount, notes, timestamps)
-- **Transfer Validation**: Prevents same-account transfers
+## ✨ Key Features
 
-## 🛠️ Tech Stack
+### 1. Authentication & Security
+- **Registration Validation**: Enforces valid email formats, lowercase/trim normalization, and minimum password length ($\ge 6$ characters).
+- **Password Security**: Bcrypt hashing with automated salt generation.
+- **JWT Authorization**: Stateless token verification (`Authorization: Bearer <token>`) with automatic expiration.
+- **Mass Assignment Protection**: Strict update whitelisting (`amount`, `category`, `division`, `account`, `description`) and query scoping (`userId: req.user.id`).
 
-- **Runtime**: Node.js
-- **Framework**: Express
-- **Database**: MongoDB with Mongoose
-- **Authentication**: JSON Web Tokens (JWT)
-- **Password Hashing**: bcryptjs
-- **Environment Variables**: dotenv
-- **CORS**: cors
-- **Dev Tools**: nodemon
+### 2. Transaction Management & Business Rules
+- **Income & Expense CRUD**: Full lifecycle management with numeric validation and categorical tagging.
+- **12-Hour Integrity Lock**: Enforces a strict 12-hour rule—transactions older than 12 hours cannot be edited or deleted.
+- **Division Segregation**: Filter transactions between `Personal` and `Office`.
+
+### 3. Multi-Account Transfers
+- **Dedicated Transfer Schema**: Tracks fund movements between `Cash`, `Bank`, and `Wallet` accounts.
+- **Validation**: Prevents transferring funds between the same source and destination account.
+
+### 4. Advanced Analytics & Aggregations
+- **Category Summary**: MongoDB aggregation pipeline grouping expenses and income by category.
+- **End-of-Day Date Filtering**: Correctly includes transactions across full UTC boundaries (`23:59:59.999Z` for `YYYY-MM-DD` inputs).
+
+---
+
+## 🛠️ Actual Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Runtime** | Node.js (v20.x) | JavaScript runtime engine |
+| **Framework** | Express.js 5.x | REST API routing and middleware |
+| **Database** | MongoDB Atlas via Mongoose 9.x | Document database and object data modeling |
+| **Authentication** | JSON Web Tokens (`jsonwebtoken`) & `bcryptjs` | Stateless authentication and password hashing |
+| **Serverless Adapter** | `serverless-http` | Wraps Express app for AWS Lambda & API Gateway |
+| **Cloud Compute** | AWS Lambda | Serverless execution |
+| **API Gateway** | AWS API Gateway (HTTP API) | Managed API proxy & CORS handling |
+| **CI/CD** | GitHub Actions | Automated build, package, and deployment pipeline |
+
+---
+
+## 🧠 Important Technical Decisions
+
+1. **Dual-Target Express Architecture**:
+   - `app.js`: Exports the pure Express instance (routes, middleware, 404, and centralized error handler) without binding to a network port.
+   - `server.js`: Standard local runner (`app.listen(PORT)`) for local development.
+   - `lambda.js`: Production serverless adapter utilizing `serverless-http`.
+
+2. **MongoDB Connection Caching in Serverless**:
+   - To avoid connection exhaustion and reduce cold-start latency, `config/db.js` caches the Mongoose connection promise and checks `readyState >= 1` before connecting.
+   - Sets `context.callbackWaitsForEmptyEventLoop = false` to allow Lambda to freeze background database event loops immediately upon responding.
+
+3. **Safe Error Handling**:
+   - Centralized 4-argument Express error middleware sanitizes internal errors and prevents stack traces or raw database exceptions from leaking to clients.
+
+---
 
 ## 🔐 Environment Variables
 
-The application requires the following environment variables:
+The backend uses the following environment variables (template available in [`.env.example`](file:///.env.example)):
 
-```
-PORT
-MONGO_URI
-JWT_SECRET
-```
+| Variable | Description | Example / Format |
+|---|---|---|
+| `PORT` | Local server port | `5000` |
+| `MONGO_URI` | MongoDB Atlas connection string | `mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/<db>?retryWrites=true&w=majority` |
+| `JWT_SECRET` | Secret key for signing and verifying tokens | `your_strong_jwt_secret_key` |
 
-**Format**: The environment variables should be configured as follows:
+---
 
-**Example structure**:
-```
-PORT=5000
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/dbname
-JWT_SECRET=your_super_secret_jwt_key_here
-```
-
-## 📦 Installation & Setup
+## 📦 Local Run Instructions
 
 ### Prerequisites
-- Node.js (v18 or higher recommended)
-- MongoDB Atlas account or local MongoDB instance
-- npm or yarn package manager
+- Node.js (v18 or v20+)
+- MongoDB Atlas cluster or local MongoDB instance
 
 ### Steps
-
-1. **Clone the repository**
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/Harshit-Patle/money-manager-backend.git
    cd money-manager-backend
    ```
 
-2. **Install dependencies**
+2. **Install dependencies**:
    ```bash
    npm install
    ```
 
-3. **Configure environment variables**
-   
-   Create a `.env` file in the root directory and add:
-   ```
-   PORT=5000
-   MONGO_URI=your_mongodb_connection_string
-   JWT_SECRET=your_jwt_secret_key
+3. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and supply your MONGO_URI and JWT_SECRET
    ```
 
-4. **Run the development server**
+4. **Start development server**:
    ```bash
    npm run dev
    ```
+   API runs at `http://localhost:5000`.
 
-   The API will be available at `http://localhost:5000`
+---
 
+## 👤 Pre-Seeded Demo Account
 
-## 🚀 Final Commit Hash
+| Email | Password | Access |
+|---|---|---|
+| `demo.user@moneymanager.com` | `Password@123` | Pre-populated with income, expense, and transfer records |
 
-**Backend Final Implementation Commit**: `590920aff8787bad1f836e2a4a50fa0fee48f1cc`
+---
 
-> **Note**: Any commits after the above hash are documentation-only updates and do not affect the application's functionality. These commits may include README updates, comment additions, or other non-code documentation improvements.
+## ⚠️ Known Limitations
 
-## 📋 Submission Details
-
-Complete submission information including the project description, live deployed URLs,
-GitHub repository links, demo video link, and final commit hashes is provided in
-`submission-details.txt` located in the root of this repository.
-
+- **Serverless Cold Starts**: Initial invocation after a period of inactivity may take 1–2 seconds while AWS provisions the container and connects to MongoDB Atlas.
+- **12-Hour Modification Window**: Past transactions older than 12 hours cannot be modified (enforced by design for audit integrity).
