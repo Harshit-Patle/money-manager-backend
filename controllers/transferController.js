@@ -2,6 +2,17 @@ const Transfer = require("../models/Transfer");
 
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
+const parseDateBoundary = (dateStr, isEndOfDay = false) => {
+    if (!dateStr) return null;
+    const trimmed = String(dateStr).trim();
+    const date = new Date(trimmed);
+    if (isNaN(date.getTime())) return null;
+    if (isEndOfDay && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        date.setUTCHours(23, 59, 59, 999);
+    }
+    return date;
+};
+
 exports.createTransfer = async (req, res) => {
     try {
         let { fromAccount, toAccount, amount, description, division } = req.body;
@@ -44,8 +55,11 @@ exports.getTransfers = async (req, res) => {
 
         if (from || to) {
             filter.createdAt = {};
-            if (from) filter.createdAt.$gte = new Date(from);
-            if (to) filter.createdAt.$lte = new Date(to);
+            const fromDate = parseDateBoundary(from, false);
+            const toDate = parseDateBoundary(to, true);
+            if (fromDate) filter.createdAt.$gte = fromDate;
+            if (toDate) filter.createdAt.$lte = toDate;
+            if (!fromDate && !toDate) delete filter.createdAt;
         }
 
         const transfers = await Transfer.find(filter).sort({ createdAt: -1 });

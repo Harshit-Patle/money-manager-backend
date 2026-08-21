@@ -1,6 +1,17 @@
 const Transaction = require("../models/Transaction");
 const mongoose = require("mongoose");
 
+const parseDateBoundary = (dateStr, isEndOfDay = false) => {
+    if (!dateStr) return null;
+    const trimmed = String(dateStr).trim();
+    const date = new Date(trimmed);
+    if (isNaN(date.getTime())) return null;
+    if (isEndOfDay && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        date.setUTCHours(23, 59, 59, 999);
+    }
+    return date;
+};
+
 /* =========================
    ADD INCOME / EXPENSE
 ========================= */
@@ -73,8 +84,11 @@ exports.getTransactions = async (req, res) => {
 
         if (from || to) {
             filter.createdAt = {};
-            if (from) filter.createdAt.$gte = new Date(from);
-            if (to) filter.createdAt.$lte = new Date(to);
+            const fromDate = parseDateBoundary(from, false);
+            const toDate = parseDateBoundary(to, true);
+            if (fromDate) filter.createdAt.$gte = fromDate;
+            if (toDate) filter.createdAt.$lte = toDate;
+            if (!fromDate && !toDate) delete filter.createdAt;
         }
 
         const transactions = await Transaction.find(filter).sort({
@@ -258,14 +272,24 @@ exports.deleteTransaction = async (req, res) => {
 ========================= */
 exports.getCategorySummary = async (req, res) => {
     try {
-        const { from, to } = req.query;
+        const { from, to, division } = req.query;
 
-        const matchStage = { userId: req.user.id, category: { $ne: "Transfer" } };
+        const matchStage = {
+            userId: new mongoose.Types.ObjectId(req.user.id),
+            category: { $ne: "Transfer" }
+        };
+
+        if (division) {
+            matchStage.division = division;
+        }
 
         if (from || to) {
             matchStage.createdAt = {};
-            if (from) matchStage.createdAt.$gte = new Date(from);
-            if (to) matchStage.createdAt.$lte = new Date(to);
+            const fromDate = parseDateBoundary(from, false);
+            const toDate = parseDateBoundary(to, true);
+            if (fromDate) matchStage.createdAt.$gte = fromDate;
+            if (toDate) matchStage.createdAt.$lte = toDate;
+            if (!fromDate && !toDate) delete matchStage.createdAt;
         }
 
         const summary = await Transaction.aggregate([
