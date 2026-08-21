@@ -6,11 +6,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// STRIP STAGE PREFIX IF PRESENT (FOR AWS API GATEWAY /default STAGE)
+// STRIP STAGE AND FUNCTION PREFIX IF PRESENT (FOR AWS API GATEWAY)
 app.use((req, res, next) => {
-    if (req.url.startsWith("/default")) {
-        req.url = req.url.replace(/^\/default/, "") || "/";
-    }
+    req.url = req.url
+        .replace(/^\/default\/moneymanager-backend/, "")
+        .replace(/^\/moneymanager-backend/, "")
+        .replace(/^\/default/, "") || "/";
     next();
 });
 
