@@ -156,14 +156,54 @@ exports.updateTransaction = async (req, res) => {
             return res.json(updatedPair);
         }
 
-        const updatedTransaction = await Transaction.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
+        const updates = {};
+
+        if (req.body.amount !== undefined) {
+            const amount = Number(req.body.amount);
+            if (isNaN(amount) || amount <= 0) {
+                return res.status(400).json({ message: "Invalid amount" });
+            }
+            updates.amount = amount;
+        }
+
+        if (req.body.type !== undefined) {
+            if (!["income", "expense"].includes(req.body.type)) {
+                return res.status(400).json({ message: "Invalid transaction type" });
+            }
+            updates.type = req.body.type;
+        }
+
+        if (req.body.category !== undefined) {
+            updates.category = String(req.body.category).trim();
+        }
+
+        if (req.body.division !== undefined) {
+            if (!["Personal", "Office"].includes(req.body.division)) {
+                return res.status(400).json({ message: "Invalid division" });
+            }
+            updates.division = req.body.division;
+        }
+
+        if (req.body.account !== undefined) {
+            if (!["Cash", "Bank", "Wallet"].includes(req.body.account)) {
+                return res.status(400).json({ message: "Invalid account" });
+            }
+            updates.account = req.body.account;
+        }
+
+        if (req.body.description !== undefined) {
+            updates.description = String(req.body.description).trim();
+        }
+
+        const updatedTransaction = await Transaction.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user.id },
+            { $set: updates },
+            { new: true, runValidators: true }
         );
 
         res.json(updatedTransaction);
     } catch (error) {
+        console.error("Update transaction error:", error);
         res.status(500).json({ message: "Server error" });
     }
 };

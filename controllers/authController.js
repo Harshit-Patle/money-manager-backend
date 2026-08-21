@@ -5,7 +5,27 @@ const jwt = require("jsonwebtoken");
 // REGISTER
 exports.register = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        let { name, email, password } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: "Name, email, and password are required" });
+        }
+
+        name = String(name).trim();
+        email = String(email).toLowerCase().trim();
+
+        if (!name) {
+            return res.status(400).json({ message: "Name cannot be empty" });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: "Please provide a valid email address" });
+        }
+
+        if (typeof password !== "string" || password.length < 6) {
+            return res.status(400).json({ message: "Password must be at least 6 characters long" });
+        }
 
         // check user exists
         const existingUser = await User.findOne({ email });
@@ -18,7 +38,7 @@ exports.register = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // create user
-        const user = await User.create({
+        await User.create({
             name,
             email,
             password: hashedPassword,
@@ -28,14 +48,21 @@ exports.register = async (req, res) => {
             message: "User registered successfully",
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Register error:", error);
+        res.status(500).json({ message: "Server error during registration" });
     }
 };
 
 // LOGIN
 exports.login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+
+        email = String(email).toLowerCase().trim();
 
         // check user
         const user = await User.findOne({ email });
@@ -65,6 +92,7 @@ exports.login = async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Login error:", error);
+        res.status(500).json({ message: "Server error during login" });
     }
 };

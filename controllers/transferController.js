@@ -85,27 +85,48 @@ exports.updateTransfer = async (req, res) => {
         }
 
         if (req.body.description !== undefined) {
-            updates.description = req.body.description;
+            updates.description = String(req.body.description).trim();
         }
 
-        if (req.body.fromAccount !== undefined) updates.fromAccount = req.body.fromAccount;
-        if (req.body.toAccount !== undefined) updates.toAccount = req.body.toAccount;
-        if (req.body.division !== undefined) updates.division = req.body.division;
+        if (req.body.fromAccount !== undefined) {
+            if (!["Cash", "Bank", "Wallet"].includes(req.body.fromAccount)) {
+                return res.status(400).json({ message: "Invalid from account" });
+            }
+            updates.fromAccount = req.body.fromAccount;
+        }
 
-        if (updates.fromAccount && updates.toAccount && updates.fromAccount === updates.toAccount) {
+        if (req.body.toAccount !== undefined) {
+            if (!["Cash", "Bank", "Wallet"].includes(req.body.toAccount)) {
+                return res.status(400).json({ message: "Invalid to account" });
+            }
+            updates.toAccount = req.body.toAccount;
+        }
+
+        if (req.body.division !== undefined) {
+            if (!["Personal", "Office"].includes(req.body.division)) {
+                return res.status(400).json({ message: "Invalid division" });
+            }
+            updates.division = req.body.division;
+        }
+
+        const effectiveFrom = updates.fromAccount || transfer.fromAccount;
+        const effectiveTo = updates.toAccount || transfer.toAccount;
+
+        if (effectiveFrom === effectiveTo) {
             return res
                 .status(400)
                 .json({ message: "From and To accounts must be different" });
         }
 
-        const updatedTransfer = await Transfer.findByIdAndUpdate(
-            req.params.id,
+        const updatedTransfer = await Transfer.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user.id },
             { $set: updates },
-            { new: true }
+            { new: true, runValidators: true }
         );
 
         res.json(updatedTransfer);
     } catch (error) {
+        console.error("Update transfer error:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
